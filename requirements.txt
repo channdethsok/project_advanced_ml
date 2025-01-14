@@ -1,2 +1,5 @@
 pandas
 pretty-midi
+miditok
+transformers[torch]
+datasets

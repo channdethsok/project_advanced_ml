@@ -172,3 +172,6 @@ cython_debug/
 
 # Datasets
 Annotated-MIDI-Dataset/
+data/lmd-full_and_reddit_MIDI_dataset/sentenceWord_level_6/
+data/lmd-full_and_reddit_MIDI_dataset/sentenceWord_level_6_MIDI/
+data/tokens/
