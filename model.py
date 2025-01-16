@@ -3,9 +3,13 @@ import torch.nn as nn
 import torch
 from symusic import Score
 
+
 class LyricsGenerator(nn.Module):
-    def __init__(self, lyrics_vocab_size, d_model, max_lyrics_length, max_midi_length):
+    def __init__(self, lyrics_tokenizer, lyrics_vocab_size, d_model, max_lyrics_length, max_midi_length):
         super(LyricsGenerator, self).__init__()
+
+        self.lyrics_tokenizer = lyrics_tokenizer
+        self.lyrics_pad_token = lyrics_tokenizer.pad_token_id
 
         # MIDI Encoder
         self.midi_encoder = AutoModel.from_pretrained("ruru2701/musicbert-v1.1")
@@ -13,7 +17,7 @@ class LyricsGenerator(nn.Module):
         self.midi_positional_embedding = nn.Embedding(max_midi_length, d_model)
 
         # GPT-2 for lyrics
-        self.gpt2 = GPT2LMHeadModel.from_pretrained('gpt2', pad_token_id=50257)
+        self.gpt2 = GPT2LMHeadModel.from_pretrained('gpt2', pad_token_id=self.lyrics_pad_token)
         self.gpt2.resize_token_embeddings(lyrics_vocab_size)
         self.lyrics_positional_embedding = nn.Embedding(max_lyrics_length, d_model)
 
@@ -94,7 +98,7 @@ def generate_lyrics(
     # Pad or truncate MIDI tokens to max_midi_length
     midi_tokens = midi_tokens[:max_midi_length]
     padding_length = max_midi_length - len(midi_tokens)
-    midi_tokens = midi_tokens + [0] * padding_length  # Pad with 0s
+    midi_tokens = midi_tokens + [midi_tokenizer.pad_token_id] * padding_length  # Pad with 0s
     midi_tokens = torch.tensor(midi_tokens, dtype=torch.long).unsqueeze(0).to(device)
 
     # Initialize input for lyrics generation
