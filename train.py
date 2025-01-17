@@ -1,113 +1,95 @@
 import os
-import logging
-import argparse
+from tqdm import tqdm
 import torch
-import pandas as pd
-from torch.optim import AdamW
-from transformers import get_linear_schedule_with_warmup
-from src.data import prepare_dataloaders
-from src.model import LyricsGenerator
-from src.utils import initialize_lyrics_tokenizer, initialize_midi_tokenizer,train
+from torch import nn
+from torch.amp import autocast, GradScaler
 
-
-def setup_logging(save_dir):
+def train(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, device, lyrics_tokenizer, save_every=1):
+    model.to(device)
+    scaler = GradScaler()
+    loss_fct = nn.CrossEntropyLoss(ignore_index=lyrics_tokenizer.pad_token_id)
+    save_dir = "model_checkpoint"
     os.makedirs(save_dir, exist_ok=True)
-    logging.basicConfig(
-        filename=os.path.join(save_dir, "training.log"),
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    logging.getLogger().addHandler(console)
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0
+        loop = tqdm(train_dataloader, leave=True)
+        for i, batch in enumerate(loop):
+            optimizer.zero_grad()
 
+            lyrics_ids = batch['lyrics_ids'].to(device)
+            lyrics_attention_mask = batch['lyrics_attention_mask'].to(device)
+            midi_tokens = batch['midi_tokens'].to(device)
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Train Lyrics Generator Model")
-    parser.add_argument("--data_dir", type=str, default="data",
-                        help="Path to the dataset directory")
-    parser.add_argument("--save_dir", type=str, default="logging",
-                        help="logging")
-    parser.add_argument("--batch_size", type=int, default=4,
-                        help="Batch size for training and validation")
-    parser.add_argument("--epochs", type=int, default=10,
-                        help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=5e-5,
-                        help="Learning rate for the optimizer")
-    parser.add_argument("--num_warmup_steps", type=int, default=0,
-                        help="number of warm up step")
-    parser.add_argument("--max_length", type=int, default=512,
-                        help="Maximum sequence length for tokenization")
-    parser.add_argument("--device", type=str, default="cuda",
-                        help="Device to train on (e.g., 'cuda' or 'cpu')")
-    return parser.parse_args()
+            with autocast(device_type=device.type):
+                logits = model(lyrics_ids, lyrics_attention_mask, midi_tokens)
+                loss = loss_fct(logits.transpose(1, 2), lyrics_ids)
+                train_loss += loss.item()
 
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            scheduler.step()
 
-def main():
-    args = parse_arguments()
+            # # Debugging 
+            # if i % 300 == 0:
+            #     print(f"Epoch {epoch + 1}, Batch {i}/{len(train_dataloader)}")
+            #     print(f"Loss: {loss.item():.4f}")
 
-    # Log
-    setup_logging(args.save_dir)
-    logging.info("Training started.")
+            #     # Decode input lyrics and predictions
+            #     decoded_input = lyrics_tokenizer.decode(lyrics_ids[0].tolist(), skip_special_tokens=True)
+            #     predicted_tokens = logits.argmax(dim=-1)[0]
+            #     decoded_prediction = lyrics_tokenizer.decode(predicted_tokens.tolist(), skip_special_tokens=True)
 
-    # Tokenizers
-    lyrics_tokenizer = initialize_lyrics_tokenizer()
-    midi_tokenizer = initialize_midi_tokenizer()
+            #     # print(f"Input Lyrics: {decoded_input}")
+            #     print("_______________________________")
+            #     print(f"Predicted Lyrics: {decoded_prediction}")
+            #     # print(f"MIDI Tokens: {midi_tokens[0].cpu().numpy()}")
+            loop.set_description(f"Epoch {epoch}")
+            loop.set_postfix(loss=loss.item())
 
-    # Data
-    try:
-        df = pd.read_csv('data/lyrics_midi_data.csv')
-        train_dataloader, val_dataloader = prepare_dataloaders(
-            df=df,
-            lyrics_tokenizer=lyrics_tokenizer,
-            midi_tokenizer=midi_tokenizer,
-            max_length=args.max_length,
-            root_dir=args.data_dir,
-            batch_size=args.batch_size,
-            # subset_size=100,
-        )
-        logging.info("DataLoaders prepared successfully.")
-    except Exception as e:
-        logging.error(f"Error preparing DataLoaders: {e}")
-        raise
+        val_loss = validate(model, val_dataloader, loss_fct, device)
+        print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {train_loss / len(train_dataloader):.4f}, Validation Loss: {val_loss:.4f}")
 
-    # Model
-    try:
-        model = LyricsGenerator(
-            lyrics_tokenizer=lyrics_tokenizer,
-            d_model=768,
-            max_lyrics_length=args.max_length,
-            max_midi_length=args.max_length
-        )
-        logging.info("Model initialized successfully.")
-    except Exception as e:
-        logging.error(f"Error initializing model: {e}")
-        raise
+        # Save Checkpoint
+        if (epoch + 1) % save_every == 0:
+            save_checkpoint(model, optimizer, scheduler, epoch, save_dir)
+            print(f"Checkpoint saved for epoch {epoch + 1}!")
+    if not os.path.exists(checkpoint_path):
+        save_checkpoint(model, optimizer, scheduler, epoch, save_dir)
+        print(f"Checkpoint saved for epoch {epoch + 1}!")
 
-    # Optimizer and Scheduler
-    optimizer = AdamW(model.parameters(), lr=args.lr)
-    total_steps = len(train_dataloader) * args.epochs
-    scheduler =get_linear_schedule_with_warmup(optimizer, num_training_steps=total_steps, num_warmup_steps=args.num_warmup_steps)
+def validate(model, dataloader, loss_fct, device):
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for batch in dataloader:
+            lyrics_ids = batch['lyrics_ids'].to(device)
+            lyrics_attention_mask = batch['lyrics_attention_mask'].to(device)
+            midi_tokens = batch['midi_tokens'].to(device)
 
-    # Training
-    try:
-        device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-        train(
-            model=model,
-            train_dataloader=train_dataloader,
-            val_dataloader=val_dataloader,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            epochs=args.epochs,
-            device=device,
-            lyrics_tokenizer=lyrics_tokenizer,
-            midi_tokenizer=midi_tokenizer,
-        )
-        logging.info("Training completed successfully.")
-    except Exception as e:
-        logging.error(f"Error during training: {e}")
-        raise
+            with autocast(device_type=device.type):
+                logits = model(lyrics_ids, lyrics_attention_mask, midi_tokens)
+                loss = loss_fct(logits.transpose(1, 2), lyrics_ids)
+                val_loss += loss.item()
+    return val_loss / len(dataloader)
 
+def save_checkpoint(model, optimizer, scheduler, epoch, save_dir):
+    os.makedirs(save_dir, exist_ok=True)
+    checkpoint_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch + 1}.pt")
+    checkpoint = {
+        'epoch': epoch + 1,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': scheduler.state_dict()
+    }
+    torch.save(checkpoint, checkpoint_path)
 
-if __name__ == "__main__":
-    main()
+def load_checkpoint(model, optimizer, scheduler, path, device):
+    checkpoint = torch.load(path, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+    epoch = checkpoint['epoch']
+    print(f"Checkpoint loaded. Resuming from epoch {epoch}.")
+    return model, optimizer, scheduler, epoch
