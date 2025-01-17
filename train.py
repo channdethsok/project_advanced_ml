@@ -11,12 +11,6 @@ from src.utils import initialize_lyrics_tokenizer, initialize_midi_tokenizer,tra
 
 
 def setup_logging(save_dir):
-    """
-    Sets up logging for tracking training progress.
-
-    Args:
-        save_dir (str): Directory where logs will be saved.
-    """
     os.makedirs(save_dir, exist_ok=True)
     logging.basicConfig(
         filename=os.path.join(save_dir, "training.log"),
@@ -52,7 +46,7 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    # logging
+    # Log
     setup_logging(args.save_dir)
     logging.info("Training started.")
 
@@ -60,7 +54,7 @@ def main():
     lyrics_tokenizer = initialize_lyrics_tokenizer()
     midi_tokenizer = initialize_midi_tokenizer()
 
-    # Dataset
+    # Data
     try:
         df = pd.read_csv('data/lyrics_midi_data.csv')
         train_dataloader, val_dataloader = prepare_dataloaders(
@@ -70,7 +64,7 @@ def main():
             max_length=args.max_length,
             root_dir=args.data_dir,
             batch_size=args.batch_size,
-            subset_size=100,
+            # subset_size=100,
         )
         logging.info("DataLoaders prepared successfully.")
     except Exception as e:
