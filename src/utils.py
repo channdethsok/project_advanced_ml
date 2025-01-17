@@ -6,6 +6,17 @@ from tqdm import tqdm
 import torch
 from torch import nn
 from torch.amp import autocast, GradScaler
+import logging
+
+log_dir = "logging"
+os.makedirs(log_dir, exist_ok=True)
+
+logging.basicConfig(
+    filename=os.path.join(log_dir, "training.log"),
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
 
 def initialize_lyrics_tokenizer():
     lyrics_tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
@@ -71,9 +82,13 @@ def train(model, train_dataloader, val_dataloader, optimizer, scheduler,
             loop.set_postfix(loss=loss.item())
 
         val_loss = validate(model, val_dataloader, loss_fct, device)
-        print(f"Epoch {epoch + 1}/{epochs}, "
-              f"Training Loss: {train_loss / len(train_dataloader):.4f}, "
-              f"Validation Loss: {val_loss:.4f}")
+        logging.info(
+            f"Epoch {epoch + 1}/{epochs}: "
+            f"Training Loss: {train_loss / len(train_dataloader):.4f}, Validation Loss: {val_loss:.4f}"
+        )
+        # print(f"Epoch {epoch + 1}/{epochs}, "
+        #       f"Training Loss: {train_loss / len(train_dataloader):.4f}, "
+        #       f"Validation Loss: {val_loss:.4f}")
 
         # Save the best checkpoint
         if val_loss < best_val_loss:
@@ -143,7 +158,6 @@ def save_checkpoint(model, optimizer, scheduler, epoch, save_dir, filename=None)
     }
     torch.save(checkpoint, checkpoint_path)
     print(f"Checkpoint saved at: {checkpoint_path}")
-
 
 def load_checkpoint(model, optimizer, scheduler, path, device):
     """
