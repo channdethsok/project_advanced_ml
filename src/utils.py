@@ -3,6 +3,7 @@ from miditok import TSD, TokenizerConfig
 from pathlib import Path
 import os
 from tqdm import tqdm
+from symusic import Score
 import torch
 from torch import nn
 from torch.amp import autocast, GradScaler
@@ -35,7 +36,7 @@ def initialize_midi_tokenizer(tokenizer_path="tokenizer/tokenizer.json"):
     return midi_tokenizer.from_pretrained(Path(tokenizer_path))
 
 def train(model, train_dataloader, val_dataloader, optimizer, scheduler,
-          epochs, device, lyrics_tokenizer, save_every=None):
+          epochs, device, lyrics_tokenizer,midi_tokenizer, save_every=None):
     """
     Trains the LyricsGenerator model.
 
@@ -56,7 +57,7 @@ def train(model, train_dataloader, val_dataloader, optimizer, scheduler,
     save_dir = "model_checkpoint"
     os.makedirs(save_dir, exist_ok=True)
     best_val_loss = float('inf')
-
+    midi_path = "./data/lmd-full_and_reddit_MIDI_dataset/sentenceWord_level_6_MIDI/0a1351c0d893782fa7a6b16e43e391b2.mid"
     for epoch in range(epochs):
         model.train()
         train_loss = 0
@@ -90,6 +91,16 @@ def train(model, train_dataloader, val_dataloader, optimizer, scheduler,
         #       f"Training Loss: {train_loss / len(train_dataloader):.4f}, "
         #       f"Validation Loss: {val_loss:.4f}")
 
+        print(f"Generating lyrics after epoch {epoch + 1}...")
+        generated_lyrics = generate_lyrics(
+                model=model,
+                midi_path=midi_path,
+                lyrics_tokenizer=lyrics_tokenizer,
+                midi_tokenizer=midi_tokenizer,
+                max_midi_length=512,
+                max_lyrics_length=512
+            )
+        logging.info(f"Generated Lyrics (Epoch {epoch + 1}): {generated_lyrics}")
         # Save the best checkpoint
         if val_loss < best_val_loss:
             best_val_loss = val_loss

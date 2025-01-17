@@ -72,7 +72,7 @@ def main():
             max_length=args.max_length,
             root_dir=args.data_dir,
             batch_size=args.batch_size,
-            subset_size=100,
+            # subset_size=100,
         )
         logging.info("DataLoaders prepared successfully.")
     except Exception as e:
@@ -108,6 +108,7 @@ def main():
             epochs=args.epochs,
             device=device,
             lyrics_tokenizer=lyrics_tokenizer,
+            midi_tokenizer=midi_tokenizer,
         )
         logging.info("Training completed successfully.")
     except Exception as e:

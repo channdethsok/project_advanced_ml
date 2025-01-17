@@ -1,7 +1,7 @@
 from transformers import AutoModel, GPT2LMHeadModel
 import torch.nn as nn
 import torch
-from symusic import Score
+from torch.nn import functional as F
 
 
 class LyricsGenerator(nn.Module):
