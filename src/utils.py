@@ -24,16 +24,18 @@ def initialize_lyrics_tokenizer():
     lyrics_tokenizer.add_special_tokens({'pad_token': '<|pad|>'})
     return lyrics_tokenizer
 
-def initialize_midi_tokenizer(tokenizer_path="tokenizer/tokenizer.json"):
+def initialize_midi_tokenizer(tokenizer_file="tokenizer/tokenizer.json"):
     config = TokenizerConfig(
         use_velocities=False,
+        # num_velocities=1,
         use_chords=False,
         use_rests=False,
         use_tempos=False,
         use_time_signatures=False,
     )
     midi_tokenizer = TSD(config)
-    return midi_tokenizer.from_pretrained(Path(tokenizer_path))
+    # return midi_tokenizer.from_pretrained(Path(tokenizer_file))
+    return midi_tokenizer
 
 def train(model, train_dataloader, val_dataloader, optimizer, scheduler,
           epochs, device, lyrics_tokenizer,midi_tokenizer, save_every=None):
@@ -218,6 +220,11 @@ def generate_lyrics(
     """
     device = next(model.parameters()).device
     model.eval()
+
+    # Check if MIDI file exists
+    midi_file = Path(midi_path)
+    if not midi_file.exists():
+        raise FileNotFoundError(f"MIDI file not found: {midi_path}")
 
     # Tokenize MIDI
     try:
