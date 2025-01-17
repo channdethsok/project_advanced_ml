@@ -2,10 +2,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+src/__pycache__
 # C extensions
 *.so
-
+model_checkpoint/
+logging/
 # Distribution / packaging
 .Python
 build/

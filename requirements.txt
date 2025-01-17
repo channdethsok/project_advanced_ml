@@ -3,3 +3,4 @@ pretty-midi
 miditok
 transformers[torch]
 datasets
+setuptools
