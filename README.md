@@ -13,7 +13,6 @@ project_advanced_ml/
 │   ├── lyrics_midi_data.csv             # Dataframe lyrics and MIDI files
 │   ├── preprocess.ipynb                 # A notebook showing how the raw data was preprocessed to create the dataset
 ├── notebooks/
-│   ├── demo_MusicBERT.ipynb             # A Jupyter Notebook demonstrating how to train and use the trained model to generate lyrics from a MIDI file.
 │   ├── demo.ipynb                       
 ├── src/
 │   ├── __init__.py                      # Package initialization
