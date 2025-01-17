@@ -6,6 +6,7 @@ This repository contains code for training a lyrics generation model that is con
 
 The repository is organized as follows:
 
+```
 project_advanced_ml/
 ├── data/
 │   ├── lmd-full_and_reddit_MIDI_dataset/# contain the lyrics and MIDI datasets.
@@ -25,3 +26,4 @@ project_advanced_ml/
 ├── generate_lyrics.py                   # For generating lyrics based on MIDI
 ├── requirements.txt                    
 ├── train_model.py                       # To train
+```
