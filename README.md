@@ -26,4 +26,5 @@ project_advanced_ml/
 ├── requirements.txt                    
 ├── train_model.py                       # To train
 ├── data_exploration.ipynb               # Ingest Midi and lyrics (check Token)
+├── Evaluation.ipynb                     # In case want to run evaluation (perplexity)
 ```
