@@ -26,7 +26,7 @@ def initialize_lyrics_tokenizer():
 
 def initialize_midi_tokenizer(tokenizer_path="tokenizer/tokenizer.json"):
     config = TokenizerConfig(
-        num_velocities=1,
+        use_velocities=False,
         use_chords=False,
         use_rests=False,
         use_tempos=False,
@@ -170,27 +170,27 @@ def save_checkpoint(model, optimizer, scheduler, epoch, save_dir, filename=None)
     torch.save(checkpoint, checkpoint_path)
     print(f"Checkpoint saved at: {checkpoint_path}")
 
-def load_checkpoint(model, optimizer, scheduler, path, device):
-    """
-    Loads a model checkpoint.
-
-    Args:
-        model (nn.Module): Model to load state into.
-        optimizer (Optimizer): Optimizer to load state into.
-        scheduler (Scheduler): Scheduler to load state into.
-        path (str): Path to the checkpoint file.
-        device (torch.device): Device to map the checkpoint to.
-
-    Returns:
-        tuple: Updated model, optimizer, scheduler, and starting epoch.
-    """
+def load_checkpoint(model, optimizer=None, scheduler=None, path=None, device=None, inference=True):
+    if path is None:
+        raise ValueError("Checkpoint path must be specified.")
+    
     checkpoint = torch.load(path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-    epoch = checkpoint['epoch']
-    print(f"Checkpoint loaded. Resuming from epoch {epoch}.")
-    return model, optimizer, scheduler, epoch
+    model.to(device)
+    
+    if inference:
+        print("Checkpoint loaded for inference.")
+        model.eval()
+        return model
+    else:
+        if optimizer is None or scheduler is None:
+            raise ValueError("Optimizer and scheduler must be provided for training mode.")
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        epoch = checkpoint['epoch']
+        print(f"Checkpoint loaded. Resuming from epoch {epoch}.")
+        return model, optimizer, scheduler, epoch
+
 
 def generate_lyrics(
     model,
@@ -232,7 +232,6 @@ def generate_lyrics(
     midi_tokens = midi_tokens + [midi_tokenizer.pad_token_id] * padding_length
     midi_tokens = torch.tensor(midi_tokens, dtype=torch.long).unsqueeze(0).to(device)
 
-    # Initialize input for lyrics generation
     if input_text:
         input_ids = lyrics_tokenizer.encode(input_text, return_tensors="pt").to(device)
     else:
@@ -240,7 +239,6 @@ def generate_lyrics(
     
     attention_mask = torch.ones_like(input_ids).to(device)
 
-    # Generate with beam search
     beam_output = model.gpt2.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,

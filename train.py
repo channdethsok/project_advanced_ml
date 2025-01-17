@@ -4,7 +4,7 @@ import argparse
 import torch
 import pandas as pd
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import StepLR
+from transformers import get_linear_schedule_with_warmup
 from src.data import prepare_dataloaders
 from src.model import LyricsGenerator
 from src.utils import initialize_lyrics_tokenizer, initialize_midi_tokenizer,train
@@ -38,12 +38,10 @@ def parse_arguments():
                         help="Batch size for training and validation")
     parser.add_argument("--epochs", type=int, default=10,
                         help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=1e-4,
+    parser.add_argument("--lr", type=float, default=5e-5,
                         help="Learning rate for the optimizer")
-    parser.add_argument("--step_size", type=int, default=10,
-                        help="Step size for learning rate scheduler")
-    parser.add_argument("--gamma", type=float, default=0.1,
-                        help="Gamma for learning rate scheduler")
+    parser.add_argument("--num_warmup_steps", type=int, default=0,
+                        help="number of warm up step")
     parser.add_argument("--max_length", type=int, default=512,
                         help="Maximum sequence length for tokenization")
     parser.add_argument("--device", type=str, default="cuda",
@@ -72,7 +70,7 @@ def main():
             max_length=args.max_length,
             root_dir=args.data_dir,
             batch_size=args.batch_size,
-            # subset_size=100,
+            subset_size=100,
         )
         logging.info("DataLoaders prepared successfully.")
     except Exception as e:
@@ -94,7 +92,8 @@ def main():
 
     # Optimizer and Scheduler
     optimizer = AdamW(model.parameters(), lr=args.lr)
-    scheduler = StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
+    total_steps = len(train_dataloader) * args.epochs
+    scheduler =get_linear_schedule_with_warmup(optimizer, num_training_steps=total_steps, num_warmup_steps=args.num_warmup_steps)
 
     # Training
     try:
