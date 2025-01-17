@@ -21,10 +21,10 @@ project_advanced_ml/
 │   ├── utils.py                         # Tokenizers, checkpoint saving,Training and validation functions
 ├── tokenizer/                           # MIDI tokenizer configuration
 │   ├── tokenizer.json                   # A JSON file containing the trained tokenizer used for MIDI data.
-├── .gitignore                    
+├── .gitignore
+├── Evaluation.ipynb                     # In case want to run evaluation (perplexity)                 
 ├── generate_lyrics.py                   # For generating lyrics based on MIDI
 ├── requirements.txt                    
 ├── train_model.py                       # To train
 ├── data_exploration.ipynb               # Ingest Midi and lyrics (check Token)
-├── Evaluation.ipynb                     # In case want to run evaluation (perplexity)
 ```
