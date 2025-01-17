@@ -85,9 +85,10 @@ def train(model, train_dataloader, val_dataloader, optimizer, scheduler,
             loop.set_postfix(loss=loss.item())
 
         val_loss = validate(model, val_dataloader, loss_fct, device)
+        perplexity = calculate_perplexity(model, val_dataloader, loss_fct, device)
         logging.info(
             f"Epoch {epoch + 1}/{epochs}: "
-            f"Training Loss: {train_loss / len(train_dataloader):.4f}, Validation Loss: {val_loss:.4f}"
+            f"Training Loss: {train_loss / len(train_dataloader):.4f}, Validation Loss: {val_loss:.4f}, Perplexity: {perplexity:.4f}"
         )
         # print(f"Epoch {epoch + 1}/{epochs}, "
         #       f"Training Loss: {train_loss / len(train_dataloader):.4f}, "
@@ -146,6 +147,24 @@ def validate(model, dataloader, loss_fct, device):
 
     return val_loss / len(dataloader)
 
+def calculate_perplexity(model, dataloader, loss_fct, device):
+    model.eval()
+    total_loss = 0
+    with torch.no_grad():
+        for batch in dataloader:
+            # Move data to the correct device
+            lyrics_ids = batch['lyrics_ids'].to(device)
+            lyrics_attention_mask = batch['lyrics_attention_mask'].to(device)
+            midi_tokens = batch['midi_tokens'].to(device)
+
+            with torch.autocast(device_type=device.type):
+                logits = model(lyrics_ids, lyrics_attention_mask, midi_tokens)
+                loss = loss_fct(logits.transpose(1, 2), lyrics_ids)
+                total_loss += loss.item()
+    
+    avg_loss = total_loss / len(dataloader)
+    perplexity = torch.exp(torch.tensor(avg_loss))
+    return perplexity.item()
 
 def save_checkpoint(model, optimizer, scheduler, epoch, save_dir, filename=None):
     """
